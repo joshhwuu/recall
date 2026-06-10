@@ -1,0 +1,22 @@
+{
+  "name": "recall-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "recall-infra": "bin/recall.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "aws-cdk": "^2.160.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0"
+  }
+}
