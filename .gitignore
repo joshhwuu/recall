@@ -1,0 +1,12 @@
+# Node / CDK
+node_modules/
+infra/cdk.out/
+infra/dist/
+*.js.map
+
+# Go
+*.test
+*.out
+
+# Editor / OS
+.DS_Store
