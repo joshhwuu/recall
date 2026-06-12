@@ -96,6 +96,35 @@ export class RecallStack extends cdk.Stack {
       integration,
     });
 
+    // GitHub Actions deploys via OIDC: no long-lived AWS keys in GitHub.
+    // The role can only be assumed by main of joshhwuu/recall, and only
+    // grants assuming the CDK bootstrap roles that cdk deploy uses.
+    const githubOidc = new iam.OpenIdConnectProvider(this, 'GithubOidc', {
+      url: 'https://token.actions.githubusercontent.com',
+      clientIds: ['sts.amazonaws.com'],
+    });
+    const deployRole = new iam.Role(this, 'GithubDeployRole', {
+      roleName: 'recall-github-deploy',
+      assumedBy: new iam.WebIdentityPrincipal(
+        githubOidc.openIdConnectProviderArn,
+        {
+          StringEquals: {
+            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          },
+          StringLike: {
+            'token.actions.githubusercontent.com:sub':
+              'repo:joshhwuu/recall:ref:refs/heads/main',
+          },
+        },
+      ),
+    });
+    deployRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['sts:AssumeRole'],
+        resources: [`arn:aws:iam::${this.account}:role/cdk-*`],
+      }),
+    );
+
     new cdk.CfnOutput(this, 'TableName', { value: this.table.tableName });
     new cdk.CfnOutput(this, 'TableArn', { value: this.table.tableArn });
     new cdk.CfnOutput(this, 'TableStreamArn', {
