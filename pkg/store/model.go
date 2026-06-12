@@ -19,6 +19,7 @@ const (
 	PrefixDate          = "DATE#"
 	PrefixRecurringDate = "DATE#R#"
 	PrefixType          = "TYPE#"
+	PrefixIdem          = "IDEM#"
 	ReminderSuffix      = "#REMINDER"
 )
 
@@ -106,6 +107,16 @@ func TypeEdgeKey(noteType, sortKey, noteULID string) Key {
 	return Key{
 		PK: PrefixType + noteType,
 		SK: sortKey + "#" + PrefixNote + noteULID,
+	}
+}
+
+// IdemKey returns the key of an idempotency marker item. Markers carry a
+// note_id attribute and a 24h TTL; a conditional put on one makes note
+// creation replay-safe (e.g. SMS webhook retries).
+func IdemKey(clientKey string) Key {
+	return Key{
+		PK: PrefixIdem + clientKey,
+		SK: "IDEM",
 	}
 }
 
