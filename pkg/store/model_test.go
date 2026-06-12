@@ -55,6 +55,13 @@ func TestIdemKey(t *testing.T) {
 	}
 }
 
+func TestSessionKey(t *testing.T) {
+	k := SessionKey("deadbeef")
+	if k.PK != "SESSION#deadbeef" || k.SK != "SESSION" {
+		t.Errorf("got %+v", k)
+	}
+}
+
 func TestReminderGSIKeys(t *testing.T) {
 	pk, sk := ReminderGSIKeys("joshua", "2026-03-12T09:00:00Z")
 	if pk != "USER#joshua#REMINDER" {

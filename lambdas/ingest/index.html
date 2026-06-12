@@ -22,46 +22,104 @@
   }
   textarea:focus { border-color: light-dark(#999, #555); }
   .row { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; }
-  button {
+  button.primary {
     padding: .55rem 1.4rem; font: inherit; font-weight: 600; cursor: pointer;
     border: none; border-radius: 10px;
     background: light-dark(#1a1a1a, #eee); color: light-dark(#fff, #111);
   }
-  button:active { transform: scale(.98); }
+  button.primary:active { transform: scale(.98); }
   #status { font-size: .9rem; opacity: .7; }
   #status.error { color: #d33; opacity: 1; }
   kbd { font-size: .75rem; opacity: .45; margin-left: auto; }
+  #signin { display: grid; gap: 1.25rem; justify-items: center; text-align: center; }
+  #signin p { margin: 0; opacity: .7; }
+  .alt { font-size: .8rem; opacity: .5; background: none; border: none; color: inherit;
+         cursor: pointer; text-decoration: underline; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-  <h1>recall</h1>
-  <textarea id="text" placeholder="What do you want to remember?" autofocus></textarea>
-  <div class="row">
-    <button id="save">Save</button>
-    <span id="status"></span>
-    <kbd>⌘↵</kbd>
-  </div>
+  <section id="signin" hidden>
+    <h1>recall</h1>
+    <p>Your personal memory. Sign in to start capturing.</p>
+    <div id="gbtn"></div>
+    <button class="alt" id="use-token">use an API token instead</button>
+  </section>
+
+  <section id="capture" hidden>
+    <h1>recall</h1>
+    <textarea id="text" placeholder="What do you want to remember?"></textarea>
+    <div class="row">
+      <button class="primary" id="save">Save</button>
+      <span id="status"></span>
+      <kbd>⌘↵</kbd>
+    </div>
+  </section>
 </main>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
 <script>
 const TOKEN_KEY = 'recall_token';
+const GOOGLE_CLIENT_ID = '__GOOGLE_CLIENT_ID__';
+const signinView = document.getElementById('signin');
+const captureView = document.getElementById('capture');
 const text = document.getElementById('text');
 const status = document.getElementById('status');
 
-function getToken() {
-  let t = localStorage.getItem(TOKEN_KEY);
-  if (!t) {
-    t = (prompt('Paste your recall API token:') || '').trim();
-    if (t) localStorage.setItem(TOKEN_KEY, t);
-  }
-  return t;
+function show(view) {
+  signinView.hidden = view !== 'signin';
+  captureView.hidden = view !== 'capture';
+  if (view === 'capture') text.focus();
 }
+
+function signOut(message) {
+  localStorage.removeItem(TOKEN_KEY);
+  show('signin');
+  renderGoogleButton();
+  if (message) console.warn(message);
+}
+
+function renderGoogleButton() {
+  if (!window.google?.accounts?.id) {
+    setTimeout(renderGoogleButton, 150);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: onGoogleCredential,
+  });
+  google.accounts.id.renderButton(document.getElementById('gbtn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill',
+  });
+}
+
+async function onGoogleCredential(response) {
+  try {
+    const res = await fetch('/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const { token } = await res.json();
+    localStorage.setItem(TOKEN_KEY, token);
+    show('capture');
+  } catch (err) {
+    alert('Sign-in failed, please try again.');
+  }
+}
+
+document.getElementById('use-token').addEventListener('click', () => {
+  const t = (prompt('Paste your recall API token:') || '').trim();
+  if (!t) return;
+  localStorage.setItem(TOKEN_KEY, t);
+  show('capture');
+});
 
 async function save() {
   const value = text.value.trim();
   if (!value) return;
-  const token = getToken();
-  if (!token) return;
   status.className = '';
   status.textContent = 'saving…';
   try {
@@ -69,15 +127,13 @@ async function save() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
+        'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY),
         'Idempotency-Key': crypto.randomUUID(),
       },
       body: JSON.stringify({ text: value, source: 'web' }),
     });
     if (res.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      status.className = 'error';
-      status.textContent = 'bad token — save again to re-enter it';
+      signOut('session expired');
       return;
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -95,6 +151,13 @@ document.getElementById('save').addEventListener('click', save);
 text.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save();
 });
+
+if (localStorage.getItem(TOKEN_KEY)) {
+  show('capture');
+} else {
+  show('signin');
+  renderGoogleButton();
+}
 </script>
 </body>
 </html>
