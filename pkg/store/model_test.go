@@ -48,6 +48,13 @@ func TestTypeEdgeKey(t *testing.T) {
 	}
 }
 
+func TestIdemKey(t *testing.T) {
+	k := IdemKey("sms-abc123")
+	if k.PK != "IDEM#sms-abc123" || k.SK != "IDEM" {
+		t.Errorf("got %+v", k)
+	}
+}
+
 func TestReminderGSIKeys(t *testing.T) {
 	pk, sk := ReminderGSIKeys("joshua", "2026-03-12T09:00:00Z")
 	if pk != "USER#joshua#REMINDER" {

@@ -16,6 +16,7 @@
     "typescript": "^5.5.0"
   },
   "dependencies": {
+    "@aws-cdk/aws-lambda-go-alpha": "^2.258.1-alpha.0",
     "aws-cdk-lib": "^2.160.0",
     "constructs": "^10.3.0"
   }

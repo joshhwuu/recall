@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>recall</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100dvh; display: grid; place-items: center;
+    font: 16px/1.5 system-ui, -apple-system, sans-serif;
+    background: light-dark(#fafafa, #111);
+    color: light-dark(#1a1a1a, #eee);
+  }
+  main { width: min(40rem, 92vw); }
+  h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; margin: 0 0 .75rem; opacity: .6; }
+  textarea {
+    width: 100%; min-height: 9rem; padding: 1rem; font: inherit; resize: vertical;
+    border: 1px solid light-dark(#ddd, #333); border-radius: 12px;
+    background: light-dark(#fff, #1a1a1a); color: inherit; outline: none;
+  }
+  textarea:focus { border-color: light-dark(#999, #555); }
+  .row { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; }
+  button {
+    padding: .55rem 1.4rem; font: inherit; font-weight: 600; cursor: pointer;
+    border: none; border-radius: 10px;
+    background: light-dark(#1a1a1a, #eee); color: light-dark(#fff, #111);
+  }
+  button:active { transform: scale(.98); }
+  #status { font-size: .9rem; opacity: .7; }
+  #status.error { color: #d33; opacity: 1; }
+  kbd { font-size: .75rem; opacity: .45; margin-left: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>recall</h1>
+  <textarea id="text" placeholder="What do you want to remember?" autofocus></textarea>
+  <div class="row">
+    <button id="save">Save</button>
+    <span id="status"></span>
+    <kbd>⌘↵</kbd>
+  </div>
+</main>
+<script>
+const TOKEN_KEY = 'recall_token';
+const text = document.getElementById('text');
+const status = document.getElementById('status');
+
+function getToken() {
+  let t = localStorage.getItem(TOKEN_KEY);
+  if (!t) {
+    t = (prompt('Paste your recall API token:') || '').trim();
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+  }
+  return t;
+}
+
+async function save() {
+  const value = text.value.trim();
+  if (!value) return;
+  const token = getToken();
+  if (!token) return;
+  status.className = '';
+  status.textContent = 'saving…';
+  try {
+    const res = await fetch('/entries', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'Idempotency-Key': crypto.randomUUID(),
+      },
+      body: JSON.stringify({ text: value, source: 'web' }),
+    });
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      status.className = 'error';
+      status.textContent = 'bad token — save again to re-enter it';
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    text.value = '';
+    text.focus();
+    status.textContent = 'saved ✓';
+    setTimeout(() => { if (status.textContent === 'saved ✓') status.textContent = ''; }, 2500);
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = 'failed — not saved';
+  }
+}
+
+document.getElementById('save').addEventListener('click', save);
+text.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save();
+});
+</script>
+</body>
+</html>
