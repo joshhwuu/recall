@@ -20,6 +20,7 @@ const (
 	PrefixRecurringDate = "DATE#R#"
 	PrefixType          = "TYPE#"
 	PrefixIdem          = "IDEM#"
+	PrefixSession       = "SESSION#"
 	ReminderSuffix      = "#REMINDER"
 )
 
@@ -117,6 +118,15 @@ func IdemKey(clientKey string) Key {
 	return Key{
 		PK: PrefixIdem + clientKey,
 		SK: "IDEM",
+	}
+}
+
+// SessionKey returns the key of a sign-in session item. tokenHash is the
+// hex SHA-256 of the raw session token — raw tokens are never stored.
+func SessionKey(tokenHash string) Key {
+	return Key{
+		PK: PrefixSession + tokenHash,
+		SK: "SESSION",
 	}
 }
 

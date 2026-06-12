@@ -136,6 +136,61 @@ func (s *Store) GetNote(ctx context.Context, userID, noteULID string) (*Note, er
 	return &n, nil
 }
 
+// Session is a signed-in user's server-side session record.
+type Session struct {
+	UserID    string `dynamodbav:"user_id"` // Google sub claim
+	Email     string `dynamodbav:"email"`
+	ExpiresAt int64  `dynamodbav:"ttl"` // epoch seconds; doubles as Dynamo TTL
+}
+
+// CreateSession stores a session under the hashed token.
+func (s *Store) CreateSession(ctx context.Context, tokenHash string, sess Session) error {
+	item, err := attributevalue.MarshalMap(sess)
+	if err != nil {
+		return fmt.Errorf("marshal session: %w", err)
+	}
+	key := SessionKey(tokenHash)
+	item["PK"] = &types.AttributeValueMemberS{Value: key.PK}
+	item["SK"] = &types.AttributeValueMemberS{Value: key.SK}
+	item["created_at"] = &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)}
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.table),
+		Item:      item,
+	})
+	if err != nil {
+		return fmt.Errorf("put session: %w", err)
+	}
+	return nil
+}
+
+// GetSession returns the live session for a hashed token, or nil if it
+// doesn't exist or has expired. Expiry is checked here because Dynamo TTL
+// deletion can lag up to ~48h behind the ttl timestamp.
+func (s *Store) GetSession(ctx context.Context, tokenHash string) (*Session, error) {
+	key, err := attributevalue.MarshalMap(SessionKey(tokenHash))
+	if err != nil {
+		return nil, fmt.Errorf("marshal session key: %w", err)
+	}
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key:       key,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+	if out.Item == nil {
+		return nil, nil
+	}
+	var sess Session
+	if err := attributevalue.UnmarshalMap(out.Item, &sess); err != nil {
+		return nil, fmt.Errorf("unmarshal session: %w", err)
+	}
+	if sess.ExpiresAt <= time.Now().Unix() {
+		return nil, nil
+	}
+	return &sess, nil
+}
+
 // DeleteNote removes a note item.
 func (s *Store) DeleteNote(ctx context.Context, userID, noteULID string) error {
 	key, err := attributevalue.MarshalMap(NoteKey(userID, noteULID))

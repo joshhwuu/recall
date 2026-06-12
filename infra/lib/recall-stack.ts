@@ -9,6 +9,9 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 
 const TOKEN_PARAM = '/recall/api-token';
+// OAuth client id is public by design (it ships in the page source).
+const GOOGLE_CLIENT_ID =
+  '769222284093-ugmcb1112os68pp9fjggc07l0jglj8kg.apps.googleusercontent.com';
 
 export class RecallStack extends cdk.Stack {
   public readonly table: dynamodb.Table;
@@ -43,6 +46,8 @@ export class RecallStack extends cdk.Stack {
       environment: {
         TABLE_NAME: this.table.tableName,
         TOKEN_PARAM,
+        GOOGLE_CLIENT_ID,
+        STATIC_TOKEN_USER: 'joshua',
       },
     });
     // Writes notes; reads idem markers on conditional-put conflicts.
@@ -83,6 +88,11 @@ export class RecallStack extends cdk.Stack {
     api.addRoutes({
       path: '/',
       methods: [apigwv2.HttpMethod.GET],
+      integration,
+    });
+    api.addRoutes({
+      path: '/auth/google',
+      methods: [apigwv2.HttpMethod.POST],
       integration,
     });
 
